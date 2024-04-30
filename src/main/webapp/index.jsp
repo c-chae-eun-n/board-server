@@ -1,6 +1,6 @@
-<%@page import="boardServer.user.UserResponseDto"%>
+<%@page import="boardServer.user.model.UserResponseDto"%>
 <%@page import="java.util.List"%>
-<%@page import="boardServer.user.UserDao"%>
+<%@page import="boardServer.user.model.UserDao"%>
 <%@page import="java.sql.DriverManager"%>
 <%@page import="java.sql.Connection"%>
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
