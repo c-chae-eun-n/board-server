@@ -62,7 +62,7 @@ public class DeleteFormAction extends HttpServlet {
 			session.removeAttribute("user");
 			response.sendRedirect("/");
 		} else {
-			response.sendRedirect("/deleteUser");
+			response.sendRedirect("/deleteUserForm");
 		}
 	}
 
