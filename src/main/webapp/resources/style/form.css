@@ -127,14 +127,13 @@ label:last-child > div {
 
 .error-container {
 	margin: 10px 0 0 0;
-	color: tomato;
+	color: #ff3f3f;
 	width: 100%;
 	font-size: 0.8em;
 	line-height: 1.5em;
 	text-align: left;
 }
 
-#agree,
 .error-container > p {
 	display: none;
 }
