@@ -56,6 +56,15 @@
 		<servlet-name>updateFormAction</servlet-name>
 		<url-pattern>/updateFormAction</url-pattern>
 	</servlet-mapping>
+	
+	<servlet>
+		<servlet-name>findUserAction</servlet-name>
+		<servlet-class>boardServer.user.controller.FindUserAction</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>findUserAction</servlet-name>
+		<url-pattern>/search/user</url-pattern>
+	</servlet-mapping>
 
 	<!-- JSP files mapping -->
 	<servlet>
