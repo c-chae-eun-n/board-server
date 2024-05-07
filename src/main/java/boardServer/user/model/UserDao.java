@@ -1,13 +1,15 @@
 package boardServer.user.model;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
+
+import boardServer.util.DBManager;
+import boardServer.util.PasswordCrypto;
 
 public class UserDao {
 	
@@ -20,7 +22,7 @@ public class UserDao {
 	
 	// 1. 생성자를 private으로
 	private UserDao() {
-		setConnection();
+//		setConnection();
 	}
 	
 	// 2. 단일 인스턴스를 생성 (클래스 내부에서)
@@ -31,27 +33,12 @@ public class UserDao {
 		return instance;
 	}
 	
-	private void setConnection() {
-		try {
-			Class.forName("com.mysql.cj.jdbc.Driver");
-			
-			String url = "jdbc:mysql://localhost:3306/board_server_db";
-			String user = "root";
-			String password = "root";
-			
-			this.conn = DriverManager.getConnection(url, user, password);
-			
-			System.err.println("[ DB 연동 성공 ]");
-		} catch (Exception e) {
-			System.err.println("[ DB 연동 실패 ]");
-			e.printStackTrace();
-		}
-	}
-	
 	public List<UserResponseDto> findUserAll() {
 		List<UserResponseDto> list = new ArrayList<UserResponseDto>();
 		
 		try {
+			conn = DBManager.getConnection();
+			
 			// 쿼리할 준비
 			String sql = "SELECT id, email, name, birth, gender, country, telecom, phone, agree FROM users";
 			pstmt = conn.prepareStatement(sql);
@@ -78,6 +65,8 @@ public class UserDao {
 			
 		} catch (Exception e) {
 			e.printStackTrace();
+		} finally {
+			DBManager.close(conn, pstmt, rs);
 		}
 		
 		return list;
@@ -87,13 +76,20 @@ public class UserDao {
 	public UserResponseDto findUserByIdAndPassword(String id, String password) {
 		UserResponseDto user = null;
 		
+		// 데이터베이스에 있는 암호화된 패스워드 str 을 얻어와
+		// PasswordCrypto.decrypt(str) 를 통해
+		// 일치 여부 확인 후
+		// return
+		
 		try {
+			System.out.println("findUserByIdAndPassword");
+			conn = DBManager.getConnection();
+			
 			// 쿼리할 준비
-			String sql = "SELECT id, email, name, birth, gender, country, telecom, phone, agree FROM users WHERE id=? AND password=?";
+			String sql = "SELECT id, email, name, birth, gender, country, telecom, phone, agree, password FROM users WHERE id=?";
 			
 			pstmt = conn.prepareStatement(sql);
 			pstmt.setString(1, id);
-			pstmt.setString(2, password);
 			
 			// 쿼리 실행
 			rs = pstmt.executeQuery();		// <- 결과가 rs 변수에 담김
@@ -109,16 +105,30 @@ public class UserDao {
 				String telecom = rs.getString(7);
 				String phone = rs.getString(8);
 				boolean agree = rs.getBoolean(9);
+				String encryptedPassword = rs.getString(10);
 				
-				// user 초기화
-				user = new UserResponseDto(id, email, name, birth, gender, country, telecom, phone, agree);
+				if(PasswordCrypto.decrypt(password, encryptedPassword)) {
+					// user 초기화
+					user = new UserResponseDto(id, email, name, birth, gender, country, telecom, phone, agree);
+					return user;
+				}
 			}
 			
 		} catch (Exception e) {
 			e.printStackTrace();
+		} finally {
+			DBManager.close(conn, pstmt, rs);
 		}
 		
-		return user;
+		return null;
+	}
+	
+	public boolean userExists(UserRequestDto userDto) {
+		return findUserByIdAndPassword(userDto.getId(), userDto.getPassword()) != null;
+	}
+	
+	public boolean userExists(String id) {
+		return findUserById(id) != null;
 	}
 	
 	public UserResponseDto createUser(UserRequestDto userDto) {
@@ -128,13 +138,16 @@ public class UserDao {
 		// 반환
 		
 		try {
+			System.out.println("createUser");
+			conn = DBManager.getConnection();
+			
 			String sql = "INSERT INTO  users(id, password, email, name, birth, gender, country, telecom, phone, agree) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";		// <- 맵핑된 값이 들어갈 것이라고 하는 것 : ?
 			
 			pstmt = conn.prepareStatement(sql);
 			
 			// sql 구문에 맵핑할 값 설정
 			pstmt.setString(1, userDto.getId());
-			pstmt.setString(2, userDto.getPassword());
+			pstmt.setString(2, PasswordCrypto.encrypt(userDto.getPassword())); 	// PasswordCrypto.encrypt(userDto.getPassword()) -> 해싱된 암호값이 들어옴
 			
 			String email = userDto.getEmail().equals("") ? null : userDto.getEmail();
 			pstmt.setString(3, email);
@@ -152,6 +165,8 @@ public class UserDao {
 			return findUserByIdAndPassword(userDto.getId(), userDto.getPassword());
 		} catch (SQLException e) {
 			e.printStackTrace();
+		} finally {
+			DBManager.close(conn, pstmt);
 		}
 		
 		return null;
@@ -164,14 +179,19 @@ public class UserDao {
 			return user;
 		}
 		
+		// 이때 쿼리 할 필요 X
+		if(findUserByIdAndPassword(userDto.getId(), userDto.getPassword()) == null)
+			return user;
+		
 		try {
-			String sql = "UPDATE users SET password=? WHERE id=? AND password=?";
+			System.out.println("password");
+			conn = DBManager.getConnection();
+			
+			String sql = "UPDATE users SET password=? WHERE id=?";
 			
 			pstmt = conn.prepareStatement(sql);
-			
-			pstmt.setString(1, newPassword);
+			pstmt.setString(1, PasswordCrypto.encrypt(newPassword));
 			pstmt.setString(2, userDto.getId());
-			pstmt.setString(3, userDto.getPassword());
 			
 			pstmt.execute();
 			
@@ -182,6 +202,8 @@ public class UserDao {
 			return user;
 		} catch (SQLException e) {
 			e.printStackTrace();
+		} finally {
+			DBManager.close(conn, pstmt);
 		}
 		
 		return user;
@@ -190,15 +212,19 @@ public class UserDao {
 	public UserResponseDto updateUserEmail(UserRequestDto userDto) {
 		UserResponseDto user = null;
 		
+		if(findUserByIdAndPassword(userDto.getId(), userDto.getPassword()) == null)
+			return user;
+		
 		try {
-			String sql = "UPDATE users SET email=? WHERE id=? AND password=?";
+			conn = DBManager.getConnection();
+			
+			String sql = "UPDATE users SET email=? WHERE id=?";
 			
 			pstmt = conn.prepareStatement(sql);
 			
 			// 맵핑하기
 			pstmt.setString(1, userDto.getEmail());
 			pstmt.setString(2, userDto.getId());
-			pstmt.setString(3, userDto.getPassword());
 			
 			// sql 구문 실행
 			pstmt.execute();
@@ -206,6 +232,8 @@ public class UserDao {
 			user = findUserByIdAndPassword(userDto.getId(), userDto.getPassword());
 		} catch (SQLException e) {
 			e.printStackTrace();
+		} finally {
+			DBManager.close(conn, pstmt);
 		}
 		
 		return user;
@@ -214,21 +242,27 @@ public class UserDao {
 	public UserResponseDto updateUserPhone(UserRequestDto userDto) {
 		UserResponseDto user = null;
 		
+		if(findUserByIdAndPassword(userDto.getId(), userDto.getPassword()) == null)
+			return user;
+		
 		try {
-			String sql = "UPDATE users SET telecom=?, phone=? WHERE id=? AND password=?";
+			conn = DBManager.getConnection();
+			
+			String sql = "UPDATE users SET telecom=?, phone=? WHERE id=?";
 			
 			pstmt = conn.prepareStatement(sql);
 			
 			pstmt.setString(1, userDto.getTelecom());
 			pstmt.setString(2, userDto.getPhone());
 			pstmt.setString(3, userDto.getId());
-			pstmt.setString(4, userDto.getPassword());
 			
 			pstmt.execute();
 			
 			user = findUserByIdAndPassword(userDto.getId(), userDto.getPassword());
 		} catch (Exception e) {
 			e.printStackTrace();
+		} finally {
+			DBManager.close(conn, pstmt);
 		}
 		
 		return user;
@@ -242,17 +276,20 @@ public class UserDao {
 		}
 		
 		try {
-			String sql = "DELETE FROM users WHERE id=? AND password=?";
+			conn = DBManager.getConnection();
+			
+			String sql = "DELETE FROM users WHERE id=?";
 			pstmt = conn.prepareStatement(sql);
 			
 			pstmt.setString(1, userDto.getId());
-			pstmt.setString(2, userDto.getPassword());
 			
 			pstmt.execute();
 			
 			return true;
 		} catch (Exception e) {
 			e.printStackTrace();
+		} finally {
+			DBManager.close(conn, pstmt);
 		}
 		
 		return false;
@@ -262,6 +299,8 @@ public class UserDao {
 		User user = null;
 		
 		try {
+			conn = DBManager.getConnection();
+			
 			// 쿼리할 준비
 			String sql = "SELECT id, email, name, birth, gender, country, telecom, phone, agree, reg_date, mod_date FROM users WHERE id=?";
 			
@@ -291,6 +330,8 @@ public class UserDao {
 			
 		} catch (Exception e) {
 			e.printStackTrace();
+		} finally {
+			DBManager.close(conn, pstmt, rs);
 		}
 		
 		return user;
