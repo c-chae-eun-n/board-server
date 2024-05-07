@@ -7,6 +7,7 @@
 </head>
 <c:import url="/header" />
 <script src="/resources/script/validation-join.js"></script>
+<script src="/resources/script/validation-id.js"></script>
 <body>
 	<section id="root">
 		<h2>회원가입</h2>
@@ -18,6 +19,7 @@
 			</div>
 			<div class="error-container">
 				<p class="error-msg" id="error-msg-id">* 아이디: 필수 정보입니다.</p>
+				<p class="error-msg" id="error-msg-id-dupl">* 아이디 : 이미 사용중인 아이디입니다.</p>
 				<p class="error-msg" id="error-msg-password">* 비밀번호: 필수 정보입니다.</p>
 				<p class="error-msg" id="error-msg-email">* 이메일: 이메일 주소가 정확한지 확인해 주세요.</p>
 			</div>
